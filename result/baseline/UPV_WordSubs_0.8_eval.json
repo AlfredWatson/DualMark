@@ -1,0 +1,1 @@
+{"tn": 100, "fp": 0, "fn": 100, "tp": 0, "fpr": 0.0, "tpr": 0.0, "tnr": 1.0, "fnr": 1.0, "precision": NaN, "recall": 0.0, "roc_auc": 0.43265, "acc_score": 0.5, "f1_score": 0.0, "tpr_at_0.05_fpr": 0.1}
