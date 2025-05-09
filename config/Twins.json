@@ -1,0 +1,22 @@
+{
+    "algorithm_name": "Twins",
+
+    "gamma_1": 0.5,
+    "delta_1": 1.0,
+    "hash_key_1": 15485863,
+    "prefix_length_1": 1,
+    "z_threshold_1": 4.0,
+
+    "f_scheme_1": "time",
+    "window_scheme_1": "left",
+
+    "gamma_2": 0.5 ,
+    "delta_2": 1.0,
+    "hash_key_2": 15485867,
+    "prefix_length_2": 1,
+    "z_threshold_2": 4.0,
+
+    "seeding_scheme_2":"simple_1",
+    "ckpt_path_2": "Please input your ts model path",
+    "store_spike_ents_2": true
+}

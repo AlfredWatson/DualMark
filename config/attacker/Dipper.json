@@ -1,0 +1,16 @@
+{
+  "use_cuda": true,
+  "use_cuda_id": 1,
+  "dipper_model": "kalpeshk2011/dipper-paraphraser-xxl",
+  "dipper_tokenizer": "google/t5-v1_1-xxl",
+  "generate_kwargs": {
+    "max_new_tokens": 100,
+    "do_sample": true,
+    "top_p": 0.75,
+    "top_k": null
+  },
+  "spacy_model": "en_core_web_lg",
+  "lexical_diversity": 60,
+  "order_diversity": 0,
+  "sentence_interval": 1
+}

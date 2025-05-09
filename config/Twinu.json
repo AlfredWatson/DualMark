@@ -1,0 +1,25 @@
+{
+  "algorithm_name": "Twinu",
+
+  "gamma_2": 0.5,
+  "delta_2": 1.0,
+  "prefix_length_2": 1,
+  "z_threshold_2": 4.0,
+
+  "ckpt_path": "Please input your ts model path",
+  "hash_key": 15485863,
+  "seeding_scheme": "simple_1",
+  "store_spike_ents": true,
+
+  "gamma_1": 0.5,
+  "delta_1": 2.0,
+  "z_threshold_1": 4.0,
+  "prefix_length_1": 1,
+
+  "bit_number": 16,
+  "sigma": 0.01,
+  "default_top_k": 20,
+  "generator_model_name": "Please input your upv generator model path",
+  "detector_model_name": "Please input your upv detector model path",
+  "detect_mode": "key"
+}

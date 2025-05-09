@@ -1,0 +1,24 @@
+{
+    "algorithm_name": "Twint",
+
+    "gamma_1": 0.5,
+    "delta_1": 1.0,
+    "prefix_length_1": 1,
+    "z_threshold_1": 4.0,
+    "hash_key_1": 15485863,
+
+    "f_scheme_1": "time",
+    "window_scheme_1": "left",
+
+    "gamma_2": 0.5,
+    "delta_2": 2.0,
+    "z_threshold_2": 4.0,
+    "prefix_length_2": 1,
+
+    "bit_number": 16,
+    "sigma": 0.01,
+    "default_top_k": 20,
+    "generator_model_name": "Please input your upv generator model path",
+    "detector_model_name": "Please input your upv detector model path",
+    "detect_mode": "key"
+}
