@@ -1,4 +1,5 @@
 # DualMark
+
 A Novel Dual Watermarking Approach for Large Language Models
 
 ## Overview
@@ -18,7 +19,6 @@ Watermarking is a promising approach to detect AI-generated text by embedding im
 ✅ **Flexible Composition**: Can be used with two different methods (e.g., KGW + UPV), or two instances of the same method (e.g., KGW + KGW).
 
 ✅ **Preserves Text Quality**: Maintains similar levels of fluency, coherence, and semantic integrity as baseline methods.
-
 
 # Requirements and Installation
 
@@ -137,14 +137,14 @@ If you use this code in your research, please cite the following paper:
 ```bib
 @inproceedings{XXX,
   title={DualMark: A Novel Dual Watermarking Approach for Large Language Models},
-  author={Jipeng Qiang, Jifei Hao, Yun Li, Yi Zhu, Yunhao Yuan, Xiaoye Ouyang},
+  author={anonymous},
   year={202X},
 }
 ```
 
 ---
-If you have any question about how to run the code. Please contact haojifei2000@gmail.com
 
+If you have any question about how to run the code. Please contact anonymous@gmail.com
 
 [MarkLLM-code]: https://github.com/THU-BPM/MarkLLM
 [TSW-code]: https://github.com/mignonjia/TS_watermark
