@@ -367,26 +367,16 @@ class TwinsLogitsProcessor(LogitsProcessor):
 
         for batch_idx in range(input_ids.shape[0]):
             green_list_ids_kgw = self.utils.get_greenlist_ids_kgw(input_ids[batch_idx])
-            # green_tokens_mask = self._calc_greenlist_mask(
-            #     logits=scores[batch_idx], greenlist_token_ids=green_list_ids_kgw
-            # )
-            # scores[batch_idx][green_tokens_mask] = scores[batch_idx][green_tokens_mask] + self.config.delta_kgw
 
             green_list_ids_ts, gamma_ts, delta_ts, gamma_len_ts = self.utils.get_green_list_ids_ts(
                 input_ids_ts[batch_idx], 'process'
             )
-            # green_tokens_mask = self._calc_greenlist_mask(
-            #     logits=scores[batch_idx], greenlist_token_ids=green_list_ids_ts
-            # )
-            # delta_ts = delta_ts.to(dtype=scores.dtype)
-            # scores[batch_idx][green_tokens_mask] = scores[batch_idx][green_tokens_mask] + delta_ts
 
             greenlist_ids_1_set = set(green_list_ids_kgw.tolist())
             greenlist_ids_2_set = set(green_list_ids_ts.tolist())
             common_set = greenlist_ids_1_set & greenlist_ids_2_set
             common_ids = torch.tensor(list(common_set), dtype=torch.long)
 
-            # get green-list token mask and add bias on each logits base on green-list mask
             green_tokens_mask = self._calc_greenlist_mask(
                 logits=scores[batch_idx], greenlist_token_ids=common_ids
             )
@@ -395,15 +385,6 @@ class TwinsLogitsProcessor(LogitsProcessor):
             scores[batch_idx][green_tokens_mask] = (scores[batch_idx][green_tokens_mask]
                                                     + delta_ts
                                                     + self.config.delta_kgw)
-
-            # 将 logits 转换为概率分布
-            # probs = torch.softmax(scores[batch_idx], dim=-1)
-            # 提取目标位置的真实 token
-            # target_tokens = input_ids[:, 1:]  # 去掉第一个 token（<s>）
-            # predicted_probs = probs[:, :-1].gather(dim=-1, index=target_tokens.unsqueeze(-1)).squeeze(-1)
-            # 计算每个位置的熵
-            # entropy_per_token = -torch.log2(predicted_probs + 1e-10)  # 防止 log(0)
-            # average_entropy = entropy_per_token.mean().item()
 
         return scores
 
@@ -433,36 +414,10 @@ class Twins(BaseWatermark):
         encoded_text = self.config.generation_tokenizer(
             text, return_tensors="pt", add_special_tokens=False
         )["input_ids"][0].to(self.config.device)
-        # haojifei = min(self.config.lo_ts, self.config.lo_kgw)
-        # encoded_text = encoded_text[self.config.gen_kwargs['min_length'] - self.config.gen_kwargs['max_new_tokens']
-        #                             + haojifei - 1:]
 
         # Compute z_score using a utility method
         z_score_1, green_token_flags_1 = self.utils.score_sequence_kgw(encoded_text)
         z_score_2, green_token_flags_2 = self.utils.score_sequence_ts(encoded_text)
-
-        ts = self.config.generation_tokenizer.convert_ids_to_tokens(encoded_text)
-        for m1, m2, t in zip(green_token_flags_1, green_token_flags_2, ts):
-            print(f"{t}: {m1},{m2}")
-            if m1 == 1 and m2 == 1:
-                print("dual", "===" * 3)
-            if m1 == 1 and m2 == 0:
-                print("kgw", "===" * 3)
-            if m1 == 0 and m2 == 1:
-                print("tsw", "===" * 3)
-
-        # green_token_flags_union = []
-        # green_token_count = 0
-        # for f1, f2 in zip(green_token_flags_1, green_token_flags_2):
-        #     if f1 == 0 and f2 == 0:
-        #         green_token_flags_union.append(0)
-        #     else:
-        #         green_token_count += 1
-        #         green_token_flags_union.append(1)
-
-        # num_tokens_scored = len(encoded_text) - self.config.prefix_length_1
-        # z_score_1 = self.utils.compute_z_score_1(green_token_count, num_tokens_scored)
-        # z_score_2 = self.utils.compute_z_score_2_1(green_token_count)
 
         # Determine if the z_score indicates a watermark
         is_watermarked_1: bool = z_score_1 > self.config.z_threshold_kgw
@@ -473,8 +428,6 @@ class Twins(BaseWatermark):
         # Return results based on the return_dict flag
         if return_dict:
             return {
-                "is_watermarked": is_watermarked,
-                "score": (z_score_1 + z_score_2) / 2,
                 "is_watermarked1": is_watermarked_1,
                 "score1": z_score_1,
                 "is_watermarked2": is_watermarked_2,

@@ -384,19 +384,10 @@ class TwinuLogitsProcessor(LogitsProcessor):
 
         for batch_idx in range(input_ids.shape[0]):
             greenlist_ids_upv = self.utils.get_greenlist_ids_upv(input_ids[batch_idx], scores=scores[batch_idx])
-            # green_tokens_mask_upv = self._calc_greenlist_mask(
-            #     logits=scores[batch_idx], greenlist_token_ids=torch.tensor(greenlist_ids_upv)
-            # )
-            # scores[batch_idx][green_tokens_mask_upv] = scores[batch_idx][green_tokens_mask_upv] + self.config.delta_upv
-
             greenlist_ids_ts, gamma_ts, delta_ts, gamma_len = self.utils.get_green_list_ids_ts(
                 input_ids_ts[batch_idx], 'process'
             )
             delta_ts = delta_ts.to(dtype=scores.dtype)
-            # green_tokens_mask_ts = self._calc_greenlist_mask(
-            #     logits=scores[batch_idx], greenlist_token_ids=greenlist_ids_ts
-            # )
-            # scores[batch_idx][green_tokens_mask_ts] = scores[batch_idx][green_tokens_mask_ts] + delta_ts
 
             greenlist_ids_ts_set = set(greenlist_ids_ts.tolist())
             greenlist_ids_upv_set = set(greenlist_ids_upv)
@@ -465,12 +456,10 @@ class Twinu(BaseWatermark):
         # Return results based on the return_dict flag
         if return_dict:
             return {
-                "is_watermarked": is_watermarked,
-                "score": (z_score_upv + z_score_ts) / 2,
                 "is_watermarked1": is_watermarked_upv,
                 "score1": z_score_upv,
                 "is_watermarked2": is_watermarked_ts,
                 "score2": z_score_ts,
             }
         else:
-            return is_watermarked_ts, z_score_ts
+            return is_watermarked, (z_score_upv + z_score_ts) / 2

@@ -317,16 +317,9 @@ class TwintLogitsProcessor(LogitsProcessor):
         if input_ids.shape[-1] < self.config.prefix_length_kgw:
             return scores
 
-        # green_tokens_mask_kgw = torch.zeros_like(scores)
-        # green_tokens_mask_upv = torch.zeros_like(scores)
-        # green_tokens_mask_uni = torch.zeros_like(scores)
-
         for batch_idx in range(input_ids.shape[0]):
             greenlist_ids_kgw = self.utils.get_greenlist_ids_kgw(input_ids[batch_idx])
-            # green_tokens_mask_kgw[batch_idx][greenlist_ids_kgw] = 1
-
             greenlist_ids_upv = self.utils.get_greenlist_ids_upv(input_ids[batch_idx], scores=scores[batch_idx])
-            # green_tokens_mask_upv[batch_idx][greenlist_ids_upv] = 1
 
             greenlist_ids_kgw_set = set(greenlist_ids_kgw.tolist())
             greenlist_ids_upv_set = set(greenlist_ids_upv)
@@ -339,21 +332,7 @@ class TwintLogitsProcessor(LogitsProcessor):
             scores[batch_idx][green_tokens_mask] = (scores[batch_idx][green_tokens_mask]
                                                     + self.config.delta_kgw
                                                     + self.config.delta_upv)
-
-        # green_tokens_mask_kgw = green_tokens_mask_kgw.bool()
-        # green_tokens_mask_upv = green_tokens_mask_upv.bool()
-        #
-        # scores = self._bias_greenlist_logits(
-        #     scores=scores,
-        #     greenlist_mask=green_tokens_mask_kgw,
-        #     greenlist_bias=self.config.delta_kgw
-        # )
-        # scores = self._bias_greenlist_logits(
-        #     scores=scores,
-        #     greenlist_mask=green_tokens_mask_upv,
-        #     greenlist_bias=self.config.delta_upv
-        # )
-
+            
         return scores
 
 
@@ -399,10 +378,6 @@ class Twint(BaseWatermark):
             text, return_tensors="pt", add_special_tokens=False
         )["input_ids"][0].to(self.config.device)
 
-        # haojifei = min(self.config.lo_upv, self.config.lo_kgw)
-        # encoded_text = encoded_text[self.config.gen_kwargs['min_length'] - self.config.gen_kwargs['max_new_tokens']
-        #                             + haojifei - 1:]
-
         # method kgw
         # Compute z_score using a utility method
         z_score_kgw, green_token_flags_1 = self.utils.score_sequence_kgw(encoded_text)
@@ -424,12 +399,10 @@ class Twint(BaseWatermark):
 
         if return_dict:
             return {
-                "is_watermarked": is_watermarked,
-                "score": (z_score_kgw + z_score_upv) / 2,
                 "is_watermarked1": is_watermarked_kgw,
                 "score1": z_score_kgw,
                 "is_watermarked2": is_watermarked_upv,
                 "score2": z_score_upv,
             }
         else:
-            return is_watermarked_kgw, z_score_kgw
+            return is_watermarked, (z_score_kgw + z_score_upv) / 2
