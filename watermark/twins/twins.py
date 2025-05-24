@@ -279,15 +279,9 @@ class TwinsUtils:
         var = torch.sum(self.gamma_list * (1 - self.gamma_list)).item()
         mean = torch.sum(self.gamma_list).item()
         z = (observed_count - mean) / math.sqrt(var)
-        self.gamma_list = torch.empty(0, dtype=torch.float).to(self.config.device)
-        self.delta_list = torch.empty(0, dtype=torch.float).to(self.config.device)
         return z
 
     def score_sequence_ts(self, input_ids: torch.Tensor, ) -> tuple[float, list[int]]:
-
-        self.gamma_list = torch.empty(0, dtype=torch.float).to(self.config.device)
-        self.delta_list = torch.empty(0, dtype=torch.float).to(self.config.device)
-
         num_tokens_scored = len(input_ids) - self.config.prefix_length_ts
         if num_tokens_scored < 1:
             raise ValueError(
@@ -382,9 +376,11 @@ class TwinsLogitsProcessor(LogitsProcessor):
             )
 
             delta_ts = delta_ts.to(dtype=scores.dtype)
-            scores[batch_idx][green_tokens_mask] = (scores[batch_idx][green_tokens_mask]
-                                                    + delta_ts
-                                                    + self.config.delta_kgw)
+            scores[batch_idx][green_tokens_mask] = (
+                scores[batch_idx][green_tokens_mask]
+                + delta_ts
+                + self.config.delta_kgw
+            )
 
         return scores
 
@@ -406,32 +402,3 @@ class Twins(BaseWatermark):
         self.config = algorithm_config
         self.utils = utils
         self.logits_processor = logits_processor
-
-    def detect_watermark(self, text: str, return_dict: bool = True, *args, **kwargs):
-        """Detect watermark in the text."""
-
-        # Encode the text
-        encoded_text = self.config.generation_tokenizer(
-            text, return_tensors="pt", add_special_tokens=False
-        )["input_ids"][0].to(self.config.device)
-
-        # Compute z_score using a utility method
-        z_score_1, green_token_flags_1 = self.utils.score_sequence_kgw(encoded_text)
-        z_score_2, green_token_flags_2 = self.utils.score_sequence_ts(encoded_text)
-
-        # Determine if the z_score indicates a watermark
-        is_watermarked_1: bool = z_score_1 > self.config.z_threshold_kgw
-        is_watermarked_2: bool = z_score_2 > self.config.z_threshold_ts
-
-        is_watermarked: bool = True if is_watermarked_1 or is_watermarked_2 else False
-
-        # Return results based on the return_dict flag
-        if return_dict:
-            return {
-                "is_watermarked1": is_watermarked_1,
-                "score1": z_score_1,
-                "is_watermarked2": is_watermarked_2,
-                "score2": z_score_2,
-            }
-        else:
-            return is_watermarked_1, z_score_1, is_watermarked_2, z_score_2

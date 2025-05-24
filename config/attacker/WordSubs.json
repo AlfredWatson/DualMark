@@ -1,6 +1,0 @@
-{
-  "use_cuda": true,
-  "use_cuda_id": 0,
-  "WordSubs_model": "google-bert/bert-base-cased",
-  "spacy_model": "en_core_web_lg"
-}

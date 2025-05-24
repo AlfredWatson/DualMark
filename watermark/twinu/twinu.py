@@ -183,10 +183,6 @@ class TwinuUtils:
 
     def score_sequence_ts(self, input_ids: torch.Tensor) -> tuple[float, list[int]]:
         """Score the input_ids and return z_score and green_token_flags."""
-
-        self.gamma_list = torch.empty(0, dtype=torch.float).to(self.config.device)
-        self.delta_list = torch.empty(0, dtype=torch.float).to(self.config.device)
-
         num_tokens_scored = len(input_ids) - self.config.prefix_length_ts
         if num_tokens_scored < 1:
             raise ValueError(
@@ -226,10 +222,6 @@ class TwinuUtils:
         self.gamma_list = self.gamma_list[self.config.prefix_length_ts:]
 
         z_score = self._compute_z_score_ts(green_token_count, num_tokens_scored)
-
-        # todo: 后加: 清空
-        self.gamma_list = torch.empty(0, dtype=torch.float).to(self.config.device)
-        self.delta_list = torch.empty(0, dtype=torch.float).to(self.config.device)
 
         return z_score, green_token_mask
 
@@ -397,9 +389,11 @@ class TwinuLogitsProcessor(LogitsProcessor):
             green_tokens_mask = self._calc_greenlist_mask(
                 logits=scores[batch_idx], greenlist_token_ids=common_ids
             )
-            scores[batch_idx][green_tokens_mask] = (scores[batch_idx][green_tokens_mask]
-                                                    + delta_ts
-                                                    + self.config.delta_upv)
+            scores[batch_idx][green_tokens_mask] = (
+                scores[batch_idx][green_tokens_mask]
+                + delta_ts
+                + self.config.delta_upv
+            )
 
 
         return scores
@@ -431,35 +425,5 @@ class Twinu(BaseWatermark):
         return is_watermarked, None
 
     def detect_watermark(self, text: str, return_dict: bool = True, *args, **kwargs):
-        """Detect watermark in the text."""
+        return super.detect_watermark(text, return_dict,  *args, **kwargs)
 
-        # Encode the text
-        encoded_text = self.config.generation_tokenizer(
-            text, return_tensors="pt", add_special_tokens=False
-        )["input_ids"][0].to(self.config.device)
-
-        # Compute z_score using a utility method
-        z_score_ts, green_token_mask_ts = self.utils.score_sequence_ts(encoded_text)
-
-        # Determine if the z_score indicates a watermark
-        is_watermarked_ts: bool = z_score_ts > self.config.z_threshold_ts
-
-        # Check the mode and perform detection accordingly
-        if self.config.detect_mode_upv == 'key':
-            _, _, z_score_upv = self.utils.green_token_mask_and_stats(encoded_text)
-            # Determine if the z_score indicates a watermark
-            is_watermarked_upv = z_score_upv > self.config.z_threshold_upv
-        else:  # network
-            is_watermarked_upv, z_score_upv = self._detect_watermark_network_mode(encoded_text)
-
-        is_watermarked: bool = True if is_watermarked_upv or is_watermarked_ts else False
-        # Return results based on the return_dict flag
-        if return_dict:
-            return {
-                "is_watermarked1": is_watermarked_upv,
-                "score1": z_score_upv,
-                "is_watermarked2": is_watermarked_ts,
-                "score2": z_score_ts,
-            }
-        else:
-            return is_watermarked, (z_score_upv + z_score_ts) / 2

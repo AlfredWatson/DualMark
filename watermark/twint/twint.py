@@ -329,9 +329,11 @@ class TwintLogitsProcessor(LogitsProcessor):
             green_tokens_mask = self._calc_greenlist_mask(
                 scores=scores[batch_idx], greenlist_token_ids=common_ids
             )
-            scores[batch_idx][green_tokens_mask] = (scores[batch_idx][green_tokens_mask]
-                                                    + self.config.delta_kgw
-                                                    + self.config.delta_upv)
+            scores[batch_idx][green_tokens_mask] = (
+                scores[batch_idx][green_tokens_mask]
+                + self.config.delta_kgw
+                + self.config.delta_upv
+            )
             
         return scores
 
@@ -371,38 +373,4 @@ class Twint(BaseWatermark):
         return is_watermarked, None
 
     def detect_watermark(self, text: str, return_dict: bool = True, *args, **kwargs):
-        """Detect watermark in the text."""
-
-        # Encode the text
-        encoded_text = self.config.generation_tokenizer(
-            text, return_tensors="pt", add_special_tokens=False
-        )["input_ids"][0].to(self.config.device)
-
-        # method kgw
-        # Compute z_score using a utility method
-        z_score_kgw, green_token_flags_1 = self.utils.score_sequence_kgw(encoded_text)
-
-        # Determine if the z_score indicates a watermark
-        is_watermarked_kgw: bool = z_score_kgw > self.config.z_threshold_kgw
-
-        # method upv
-        # Check the mode and perform detection accordingly
-        if self.config.detect_mode_upv == 'key':
-            _, _, z_score_upv = self.utils.green_token_mask_and_stats_2(encoded_text)
-            # Determine if the z_score indicates a watermark
-            is_watermarked_upv: bool = z_score_upv > self.config.z_threshold_upv
-        else:  # network
-            is_watermarked_upv, z_score_upv = self._detect_watermark_network_mode(encoded_text)
-            z_score_upv = z_score_kgw
-
-        is_watermarked: bool = True if is_watermarked_kgw or is_watermarked_upv else False
-
-        if return_dict:
-            return {
-                "is_watermarked1": is_watermarked_kgw,
-                "score1": z_score_kgw,
-                "is_watermarked2": is_watermarked_upv,
-                "score2": z_score_upv,
-            }
-        else:
-            return is_watermarked, (z_score_kgw + z_score_upv) / 2
+        return super.detect_watermark(text, return_dict,  *args, **kwargs)
