@@ -8,7 +8,7 @@ from utils.transformers_config import TransformersConfig
 
 if __name__ == '__main__':
 
-    watermark_name = 'Twinu'
+    watermark_name = 'Twins'
 
     text = "Please input some text to watermark model."
     
