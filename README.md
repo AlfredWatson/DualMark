@@ -1,61 +1,164 @@
 # DualMark
 
-A Novel Dual Watermarking Approach for Large Language Models
+**A Novel Dual Watermarking Approach for Large Language Models**
+
+> Zihao Qiang, Jifei Hao, Jipeng Qiang, Yi Zhu, Chaowei Zhang, Yan Liu, Wei Li
+> *Information Processing & Management*, 63 (2026) 104707 · [DOI: 10.1016/j.ipm.2026.104707](https://doi.org/10.1016/j.ipm.2026.104707)
+
+Official implementation of the **DualMark** framework, an ensemble-inspired **dual green–red watermarking** scheme for detecting machine-generated text. The full paper is provided in [`2026-dualwark.pdf`](2026-dualwark.pdf).
+
+---
 
 ## Overview
 
-Watermarking is a promising approach to detect AI-generated text by embedding imperceptible, machine-detectable patterns. However, existing green–red watermarking methods often fail under adversarial edits such as paraphrasing or context manipulation.
+Watermarking embeds imperceptible, machine-detectable patterns into generated text, and has become a leading approach for detecting LLM-generated content. The dominant *green–red* strategy (e.g., KGW) dynamically partitions the vocabulary into a *green list* and a *red list* at each decoding step and biases sampling toward green tokens. Detection then measures the excess proportion of green tokens (a `z`-score).
 
-**DualMark** is a novel **dual-watermarking framework** designed to overcome these limitations by embedding **two independent green–red watermarks** using separate context windows. During generation, only tokens appearing in **both green lists** are biased, while detection succeeds if **either watermark** yields a sufficient green-token signal. This overlapping design makes the watermark **more robust** and **harder to remove**, without sacrificing text quality.
+However, green–red methods remain vulnerable in two ways:
 
-## Key Features
+1. **Token replacement** — paraphrasing or synonym substitution replaces green tokens, shrinking the detectable signal.
+2. **Context sensitivity** — the green/red partition depends on preceding tokens, so editing those tokens reconfigures the partition and breaks alignment with the original watermark.
 
-✅ **Dual Detection Paths**: Detection succeeds if either of two embedded watermarks is preserved.
+**DualMark** addresses both problems by embedding **two independent green–red watermarks** that use **separate context windows and partitioning strategies**, then combining them in an ensemble:
 
-✅ **Stronger Resistance to Edits**: Enhanced robustness against word-level and sentence-level attacks (e.g., substitution, deletion, paraphrasing).
+- **Tiered bias at generation** — the strongest bias is applied to tokens in the *intersection* of both green lists, while a standard bias is applied to tokens unique to each list.
+- **OR fusion at detection** — the text is flagged as watermarked if *either* watermark yields a statistically significant signal.
 
-✅ **Low Overhead**: Easily integrates with existing watermarking frameworks with minimal computation cost.
+Because the two watermarks are independent, an attacker must suppress *both* signals simultaneously, which requires modifying a substantially larger fraction of the text. The design incurs only minimal overhead (one extra green–red list per step).
 
-✅ **Flexible Composition**: Can be used with two different methods (e.g., KGW + UPV), or two instances of the same method (e.g., KGW + KGW).
+---
 
-✅ **Preserves Text Quality**: Maintains similar levels of fluency, coherence, and semantic integrity as baseline methods.
+## Key Contributions
 
-# Requirements and Installation
+- **Ensemble of green–red watermarks.** First method to integrate multiple *overlapping* green–red partitions, specifically targeting the context-sensitivity limitations of the green–red family (unlike heterogeneous dual schemes such as Duwak).
+- **Robustness.** Improves detection **AUROC by over 11%** under severe word-deletion attacks and **doubles the true-positive rate (TP@1%)** against adaptive baselines under heavy paraphrasing.
+- **Minimal overhead.** Adds only ~5% generation latency (e.g., KGW+TSW adds 0.28 ms/token over KGW on a Qwen3-8B backbone).
+- **Flexible and extensible.** Two branches can be two different methods (KGW + TSW) or two instances of the same family, reusing existing watermarking procedures.
+- **Preserves text quality.** Comparable perplexity, coherence, and semantic loss to the best single-watermark baselines.
 
-To run the code, you will need to set up a Python environment with the required dependencies. You can use `pip` to install the necessary libraries (已经在`requirements.txt`中给出).
+---
 
-## Base Code
+## Method
 
-Our code fits perfectly into the watermarking framework [MarkLLM][MarkLLM-code], you can copy the code of this project directly into its directory and run tests.
+At each decoding step `i`, two independent green–red partitions are constructed from different context windows:
 
-## Model Download
+```
+G1, R1 = Method1(V, t_{i-1})
+G2, R2 = Method2(V, t_{i-2})
+```
 
-The baseline model we use in the paper is available at the following link:[TSW][TSW-code], [UPV][UPV-code].
+where `Method1` / `Method2` can be two different watermarking methods or the same method. The partitions are fully decoupled and can be computed in parallel.
 
-# Usage
+**Generation (tiered bias).** With `G∩ = G1 ∩ G2`, the logits are adjusted as:
 
-## Embedding Watermark
+```
+l̃_k = l_k + δ1 + δ2,   if k ∈ G∩
+l̃_k = l_k + δ1,        if k ∈ G1 \ G∩
+l̃_k = l_k + δ2,        if k ∈ G2 \ G∩
+l̃_k = l_k,             otherwise
+```
 
-To get the watermark text, use the following command:
+**Detection (OR fusion).** The detector reconstructs both partitions and computes independent `z`-scores:
+
+```
+z_j = (N_j − γ_j·T) / √(γ_j·(1−γ_j)·T),   j ∈ {1, 2}
+```
+
+The final decision is:
+
+```
+watermarked ⇔ (z1 > τ1) OR (z2 > τ2)
+```
+
+**Why it works.** For green-list ratio `γ = 0.5`, a random replacement erases a single watermark with probability `1 − γ = 0.5`, but erases *both* DualMark watermarks with probability only `1 − (2γ − γ²) = 0.25` — a 75% failure rate per replacement attempt. Context-window decoupling further ensures that editing one context token disrupts only one watermark's partitions, preventing error propagation across the whole signal.
+
+---
+
+## Implemented Combinations
+
+DualMark composes two base green–red methods. This repository provides the three pairwise combinations evaluated in the paper (base methods: **KGW**, **UPV**, **TSW**):
+
+| Algorithm | Composition | Config |
+|-----------|-------------|--------|
+| `Twins`   | KGW + TSW (token-specific watermarking) | [`config/Twins.json`](config/Twins.json) |
+| `Twint`   | KGW + UPV (unforgeable public-verifiable) | [`config/Twint.json`](config/Twint.json) |
+| `Twinu`   | TSW + UPV | [`config/Twinu.json`](config/Twinu.json) |
+
+Each config file holds two halves of parameters (suffixed `_1` / `_2`), one per watermark branch (e.g., `gamma_1` / `gamma_2`, `delta_1` / `delta_2`).
+
+---
+
+## Repository Structure
+
+```
+DualMark/
+├── 2026-dualwark.pdf          # The paper
+├── demo.py                    # End-to-end embed + detect demo
+├── requirements.txt           # Python dependencies
+├── config/
+│   ├── Twins.json             # KGW + TSW
+│   ├── Twint.json             # KGW + UPV
+│   └── Twinu.json             # TSW + UPV
+├── watermark/
+│   ├── twins/                 # KGW + TSW implementation
+│   ├── twint/                 # KGW + UPV implementation
+│   └── twinu/                 # TSW + UPV implementation
+├── utils/
+│   ├── base_attacker.py       # Attacker factory (AutoAttacker)
+│   └── attacker/
+│       ├── word_subs.py       # Word-substitution attack (BERT)
+│       ├── word_delete.py     # Word-deletion attack
+│       └── dipper.py          # Document-level paraphrase attack (Dipper/T5)
+└── result/
+    ├── baseline/              # Single-method & pairwise baselines
+    └── dualmark/              # DualMark (Twins/Twint/Twinu) outputs
+```
+
+---
+
+## Requirements & Installation
+
+The dependencies are listed in [`requirements.txt`](requirements.txt). Install them with:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Base Code
+
+The code is written as a plugin for the open-source watermarking toolkit **[MarkLLM][MarkLLM-code]** and reuses its framework (e.g., `watermark.base`, `watermark.auto_watermark`, `watermark.ts`, `watermark.upv`, `utils.transformers_config`). To run it:
+
+1. Clone MarkLLM and set up its environment.
+2. Copy the `watermark/`, `config/`, and `utils/` folders from this repository into the MarkLLM project root.
+3. Register the three algorithms in MarkLLM's `watermark/auto_watermark.py` by adding `Twins`, `Twint`, and `Twinu` to `WATERMARK_MAPPING_NAMES` and to the class/config mapping.
+
+> The base methods use pretrained components from their respective repositories: [TSW][TSW-code] (the TSW/TS checkpoint) and [UPV][UPV-code] (the UPV generator/detector models). Fill in the `ckpt_path` / `generator_model_name` / `detector_model_name` fields in the config files with your local model paths.
+
+### Base Model
+
+The paper uses **Qwen3-8B** for watermarked generation (`temperature = 0.7`), **OPT-6.7b** for perplexity, and **bert-base-cased** for word-substitution attacks. You can use any Hugging Face causal LM by setting `generate_model_path`.
+
+---
+
+## Usage
+
+### Embedding & Detecting a Watermark
+
+The example below works for any of `Twins`, `Twint`, or `Twinu` (change `watermark_name` accordingly).
 
 ```python
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from watermark.auto_watermark import AutoWatermark
-from watermark.auto_watermark import WATERMARK_MAPPING_NAMES
+from watermark.auto_watermark import AutoWatermark, WATERMARK_MAPPING_NAMES
 from utils.transformers_config import TransformersConfig
 
-
-watermark_name = 'Twins'
-
-text = "Please input some prompt to watermark model."
+watermark_name = 'Twins'          # 'Twins' | 'Twint' | 'Twinu'
 
 assert watermark_name in WATERMARK_MAPPING_NAMES, f"{watermark_name} not in WATERMARK_MAPPING_NAMES"
-# Device
+
 device = "cuda:3" if torch.cuda.is_available() else "cpu"
 generate_model_path = "facebook/opt-1.3b"
-# Transformers config
+
 transformers_config = TransformersConfig(
     model=AutoModelForCausalLM.from_pretrained(generate_model_path).to(device),
     tokenizer=AutoTokenizer.from_pretrained(generate_model_path),
@@ -63,88 +166,97 @@ transformers_config = TransformersConfig(
     max_new_tokens=200,
     min_length=230,
     do_sample=True,
-    no_repeat_ngram_size=4
+    no_repeat_ngram_size=4,
 )
-# Load watermark algorithm
+
 watermark_model = AutoWatermark.load(
-    f'{watermark_name}',
+    watermark_name,
     transformers_config=transformers_config,
     algorithm_config=f'./config/{watermark_name}.json',
 )
 
-watermarked_text = watermark_model.generate_watermarked_text(text)
-print(watermarked_text)
+# Embed the watermark
+prompt = "Please input some text to watermark model."
+watermarked_text = watermark_model.generate_watermarked_text(prompt)
+
+# Detect the watermark
+result = watermark_model.detect_watermark(watermarked_text)
+print(result)
 ```
 
-## Detecting Watermark
+A ready-to-run script is provided in [`demo.py`](demo.py).
 
-To detect the watermark in a given text, use the following command:
+### Running Adversarial Attacks
+
+The evaluation applies word-level and document-level attacks to the watermarked text, then re-runs detection. The attackers are exposed via `AutoAttacker` in [`utils/base_attacker.py`](utils/base_attacker.py):
 
 ```python
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from utils.base_attacker import AutoAttacker
 
-from watermark.auto_watermark import AutoWatermark
-from watermark.auto_watermark import WATERMARK_MAPPING_NAMES
-from utils.transformers_config import TransformersConfig
+attacker = AutoAttacker.load_attacker('WordSubs')    # word substitution
+# attacker = AutoAttacker.load_attacker('WordDelete') # word deletion
+# attacker = AutoAttacker.load_attacker('Dipper')     # document-level paraphrase
 
-
-watermark_name = 'Twins'
-
-text = "Please input some text for detection."
-
-assert watermark_name in WATERMARK_MAPPING_NAMES, f"{watermark_name} not in WATERMARK_MAPPING_NAMES"
-# Device
-device = "cuda:3" if torch.cuda.is_available() else "cpu"
-generate_model_path = "facebook/opt-1.3b"
-# Transformers config
-transformers_config = TransformersConfig(
-    model=AutoModelForCausalLM.from_pretrained(generate_model_path).to(device),
-    tokenizer=AutoTokenizer.from_pretrained(generate_model_path),
-    device=device,
-    max_new_tokens=200,
-    min_length=230,
-    do_sample=True,
-    no_repeat_ngram_size=4
-)
-# Load watermark algorithm
-watermark_model = AutoWatermark.load(
-    f'{watermark_name}',
-    transformers_config=transformers_config,
-    algorithm_config=f'./config/{watermark_name}.json',
-)
-
-watermarked_text_detect = watermark_model.detect_watermark(text)
-print(watermarked_text_detect)
+attacked = attacker.attack(watermarked_text)
+detect_result = watermark_model.detect_watermark(attacked.text_attacked)
 ```
 
-# Experimental Results
+---
 
-The results of our original experiments are given in the folder `result`. After statistical analysis, **DualMark** shows significant robustness improvement in several attack scenarios:
+## Experimental Results
 
-- Word-level attack: Under word replacement/deletion attacks ranging from 10% to 50%, the DualMark combination (e.g., KGW+TSW) consistently outperforms a single method in AUROC, TPR@5%FPR, and F1-score metrics.
+Experiments use 1,000 samples from the C4 dataset (via MarkLLM), each 200 ± 20 tokens, with half watermarked and half unwatermarked. Each run is repeated 10 times (rounding off the best and worst) and averaged. Detection is measured by **AUROC** and **TP@1% / TP@5%** (true-positive rate at fixed 1%/5% false-positive rates).
 
-- Document-level attack: In the face of sentence-level rewriting by Dipper attack, DualMark still maintains excellent detection results when the paraphrasing ratio is as high as 100%.
+**Clean (no-attack) setting.** All methods — single watermarks and DualMark combinations — separate watermarked from unwatermarked text essentially perfectly (AUROC ≈ 0.99–1.00, TP@1%/TP@5% ≈ 0.99–1.00).
 
-- Text quality: DualMark is comparable to the best existing methods in terms of Perplexity, Semantic Loss, Coherence, etc., proving that it does not significantly degrade text quality.
+**Word-level attacks** (substitution and deletion, attack rates 0.1–0.5):
 
-For detailed experimental results and graphs, please see the main paper.
+- Detection degrades as the attack rate increases for all methods, but DualMark combinations consistently retain substantially higher scores than single methods, especially at larger attack rates.
+- Under a 0.5 substitution attack, `KGW+TSW` reaches an AUROC of **0.87**, outperforming the heterogeneous dual baseline Duwak (0.84).
+- Word substitution is more damaging to high-precision detection (TP@1%) than deletion, since substitutions actively replace signal-carrying tokens.
 
-# Citation
+**Document-level attacks** (GPT-4o-mini paraphrase, probabilities 0.2–1.0):
 
-If you use this code in your research, please cite the following paper:
+- DualMark combinations lead in detectability across all attack probabilities; `KGW+TSW` is the most robust across almost all metrics and attack levels.
+- Under full paraphrasing (rate 1.0) of rewritten sentences, `KGW+TSW` maintains a TP@1% of **0.46** — nearly double the adaptive TSW baseline (0.23) and above KGW (0.44).
+
+**Text quality.** DualMark is comparable to the best existing methods on perplexity and semantic loss; the ensemble incurs only a slight perplexity cost in exchange for the large robustness gains.
+
+**Latency.** On a Qwen3-8B backbone, DualMark adds negligible per-token cost (e.g., KGW+TSW: 5.16 ms/token vs. 4.88 ms for KGW alone) — a ~5% increase.
+
+> Full tables, figures, ablations (effect of `γ` and `δ`), and the removal-attack analysis (Theorem 1) are in [`2026-dualwark.pdf`](2026-dualwark.pdf).
+
+---
+
+## Citation
+
+If you use this code or the DualMark method in your research, please cite:
 
 ```bib
-@inproceedings{XXX,
-  title={DualMark: A Novel Dual Watermarking Approach for Large Language Models},
-  author={anonymous},
-  year={202X},
+@article{qiang2026dualmark,
+  title   = {DualMark: A Novel Dual Watermarking Approach for Large Language Models},
+  author  = {Qiang, Zihao and Hao, Jifei and Qiang, Jipeng and Zhu, Yi and Zhang, Chaowei and Liu, Yan and Li, Wei},
+  journal = {Information Processing \& Management},
+  volume  = {63},
+  pages   = {104707},
+  year    = {2026},
+  publisher = {Elsevier},
+  doi     = {10.1016/j.ipm.2026.104707}
 }
 ```
 
 ---
 
-If you have any question about how to run the code. Please contact anonymous@gmail.com
+## References
+
+- KGW — Kirchenbauer et al., *A Watermark for Large Language Models*, ICML 2023.
+- UPV — Liu et al., *An Unforgeable Publicly Verifiable Watermark for Large Language Models*, ICLR 2024.
+- TSW — Huo et al., *Token-Specific Watermarking with Enhanced Detectability and Semantic Coherence for Large Language Models*, ICML 2024.
+- MarkLLM — Pan et al., *MarkLLM: An Open-Source Toolkit for LLM Watermarking*, EMNLP 2024 (System Demonstrations).
+
+---
+
+For questions about running the code, please open an issue in this repository.
 
 [MarkLLM-code]: https://github.com/THU-BPM/MarkLLM
 [TSW-code]: https://github.com/mignonjia/TS_watermark
