@@ -1,0 +1,94 @@
+# ---------------------------------------------------------------------------
+# macOS
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+eggs/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Jupyter / IPython
+# ---------------------------------------------------------------------------
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ---------------------------------------------------------------------------
+# Editors / IDEs
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# Model weights, checkpoints & datasets
+# (base methods load these from local paths set in ./config/*.json)
+# ---------------------------------------------------------------------------
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+*.onnx
+*.h5
+
+# Hugging Face cache
+.cache/
+huggingface/
+~/.cache/huggingface/
+
+# ---------------------------------------------------------------------------
+# Logs & experiment artifacts
+# ---------------------------------------------------------------------------
+*.log
+logs/
+runs/
+wandb/
+lightning_logs/
+outputs/
+checkpoints/
+
+# Note: ./result/ (baseline & dualmark evaluation outputs) IS tracked
+# intentionally — do not ignore it.
+
+# ---------------------------------------------------------------------------
+# Environment files (may contain API keys / local paths)
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# project
+docs/*
